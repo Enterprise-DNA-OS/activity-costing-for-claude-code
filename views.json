@@ -1,13 +1,31 @@
 [
   {
     "name": "week",
-    "title": "This week",
-    "subtitle": "Activity Costing for Claude Code: what needs attention, rendered by npm run view",
+    "title": "Weekly costing review",
     "sections": [
       {
-        "title": "Needs attention",
-        "note": "TODO(author): point this at the industry's attention view (overdue, stuck, quiet).",
-        "sql": "select 'replace me' as item, 'TODO(author)' as why"
+        "title": "Cost pools awaiting action",
+        "sql": "select pe.code period,pe.currency,p.code,p.name,p.owner,p.review_due,p.unallocated_cents from v_pool_review p join periods pe on pe.id=p.period_id where p.overdue or p.unallocated_cents>0 or trim(p.owner)='' order by pe.code,p.code"
+      }
+    ]
+  },
+  {
+    "name": "contribution",
+    "title": "Customer contribution",
+    "sections": [
+      {
+        "title": "Contribution by period and customer",
+        "sql": "select pe.code period,pe.currency,m.code,m.name,m.revenue_cents,m.direct_cents,m.overhead_cents,m.contribution_cents from v_margins m join periods pe on pe.id=m.period_id order by pe.code,m.contribution_cents"
+      }
+    ]
+  },
+  {
+    "name": "reconciliation",
+    "title": "Pool reconciliation",
+    "sections": [
+      {
+        "title": "Every cent accounted for",
+        "sql": "select pe.code period,pe.currency,p.code,p.cost_cents,p.allocated_cents,p.unallocated_cents from v_pool_review p join periods pe on pe.id=p.period_id order by pe.code,p.code"
       }
     ]
   }

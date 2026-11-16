@@ -1,0 +1,70 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {getDb,REPO_ROOT} from './lib/db.mjs';
+import {migrate} from './migrate.mjs';
+import {seed} from './seed.mjs';
+import {run,operations,money} from './costing.mjs';
+import {parseCsv} from './lib/csv.mjs';
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'costing-test-'));
+process.env.DATABASE_URL=process.env.TEST_DATABASE_URL||'';process.env.DATA_DIR=path.join(dir,'db');process.env.OUTPUT_DIR=dir;
+let db,n=0;const seen=new Set();const eq=(a,b)=>{assert.deepEqual(a,b);n++;},ok=v=>{assert.ok(v);n++;};
+const call=(...a)=>{seen.add(a[0]);return run(db,a);};
+const fail=async(a,re)=>{await assert.rejects(()=>call(...a),re);n++;};
+const by='--by=Test reviewer',period='--period=OCT';
+const go=(c,...a)=>call(c,...a,period);
+const imp=(kind,...a)=>go('import','costperform',path.join(REPO_ROOT,`examples/${kind}.csv`),`--kind=${kind}`,by,...a);
+try{
+ db=await getDb();eq((await migrate(db)).ran.length,1);eq((await migrate(db)).ran.length,0);
+ ok((await call('help')).commands.includes('sign-off'));await fail(['periods'],/init/);
+ await call('init','--name=Test Business',by);await fail(['init','--name=Again',by],/already/);await assert.rejects(()=>seed(db),/business workspace/);n++;
+ await call('add-period','--code=OCT','--name=October','--currency=NZD','--end=2026-10-31','--retain=2034-03-31',by);
+ await fail(['add-period','--code=X','--name=Bad','--currency=NZD','--end=2026-02-30','--retain=2034-03-31',by],/Date/);
+ eq((await imp('objects','--dry-run')).rows,3);eq((await go('objects')).length,0);
+ await imp('objects');eq((await imp('objects')).duplicate,true);await imp('pools',`--map=${path.join(REPO_ROOT,'examples/column-map.json')}`);await imp('drivers');
+ eq((await go('allocations')).map(x=>Number(x.allocated_cents)),[3334,3334,3333]);
+ eq((await go('reconcile'))[0],{input_cents:10001,allocated_cents:10001,unallocated_cents:0});
+ eq((await go('margins')).find(x=>x.code==='A').contribution_cents,6666);
+ eq((await go('compliance')).length,0);
+ const scenario=await go('scenario','PICK','--cost=0.02');eq(scenario.allocations.map(x=>x.allocated_cents),[1,1,0]);eq((await go('reconcile'))[0].input_cents,10001);
+ const calc=await go('calculate',by);await go('sign-off',calc.id,'--reason=Matched source',by);
+ await go('set-driver','PICK','A','--quantity=2','--evidence=New count',by);
+ await fail(['close',calc.id,'--reason=Old',by,period],/Stale/);ok((await go('runs'))[0].stale);eq((await go('insights','--question=9'))[0].rows.length,1);
+ const newer=await go('calculate',by);await fail(['close',newer.id,'--reason=Close',by,period],/Sign off/);
+ await go('sign-off',newer.id,'--reason=Checked',by);await go('close',newer.id,'--reason=Period reviewed',by);
+ await fail(['set-driver','PICK','A','--quantity=1','--evidence=No',by,period],/closed/);
+ await go('reopen','--reason=Late adjustment',by);ok((await go('runs')).every(x=>x.stale));
+ await go('add-object','--code=D','--name=Customer Delta','--segment=Retail','--revenue=10','--direct=20','--evidence=Ledger',by);
+ await fail(['add-object','--code=D','--name=Again','--segment=X','--revenue=1','--direct=0','--evidence=X',by,period],/already/);
+ await go('add-pool','--code=ZERO','--name=Zero activity','--cost=1','--unit=minutes','--owner=Moana','--review=2020-01-01','--evidence=Ledger',by);
+ eq((await go('reconcile'))[0].unallocated_cents,100);ok((await go('attention')).some(x=>x.rule==='UNALLOCATED'));
+ await go('set-driver','ZERO','D','--quantity=0','--evidence=No activity',by);eq((await go('scenario','ZERO','--cost=2')).unallocated_cents,200);
+ const unready=await go('calculate',by);await fail(['sign-off',unready.id,'--reason=Try',by,period],/Resolve findings/);
+ await go('review-pool','zero','--owner=Moana','--review=2099-01-01','--evidence=Rechecked cost',by);
+ await go('set-driver','ZERO','D','--quantity=0.0001','--evidence=Measured',by);eq((await go('reconcile'))[0].unallocated_cents,0);
+ await fail(['set-driver','PICK','Customer','--quantity=1','--evidence=X',by,period],/Ambiguous[\s\S]*A[\s\S]*D/);
+ await fail(['set-driver','PICK','D','--quantity=-1','--evidence=X',by,period],/Quantity/);
+ const bad=path.join(dir,'bad.csv');fs.writeFileSync(bad,'Code,Name,Segment,Revenue,Direct Cost,Evidence\nA,Changed,Retail,400,1,Ledger\nBROKEN,Broken,Retail,not-money,1,Ledger\n');
+ const rev=(await call('periods'))[0].revision;await fail(['import','costperform',bad,'--kind=objects',by,period],/Money/);eq((await go('objects')).find(x=>x.code==='A').name,'Customer Alpha');eq((await call('periods'))[0].revision,rev);
+ fs.writeFileSync(bad,'Pool,Object,Quantity,Evidence\nPICK,A,5,Log\nPICK,MISSING,1,Log\n');await fail(['import','costperform',bad,'--kind=drivers',by,period],/No matching/);eq(Number((await go('drivers')).find(x=>x.pool==='PICK'&&x.object==='A').quantity),2);
+ fs.writeFileSync(bad,'Code,Name,Segment,Revenue,Direct Cost,Evidence\nA,Changed,Retail,400,1,Ledger\nA,Again,Retail,1,1,Ledger\n');await fail(['import','costperform',bad,'--kind=objects',by,period],/Duplicate input/);
+ await go('log-note','--text=<script>secret</script>',by);ok((await go('history')).some(x=>x.action==='reopen'));
+ for(const c of ['pools','objects','drivers','allocations','margins','attention','compliance','reconcile','runs','history'])ok(Array.isArray(await go(c)));
+ eq((await go('insights')).length,10);await fail(['insights','--question=11',period],/1 to 10/);
+ const draft=await go('draft-review');ok(fs.readFileSync(draft.file,'utf8').includes('Cost allocation review'));
+ const archive=JSON.parse(fs.readFileSync((await go('export')).file));eq(archive.format,'activity-costing-v1');ok(archive.runs.length>=3);eq(archive.signatures.length,2);ok(archive.history.some(x=>x.detail.result?.note==='<script>secret</script>'));
+ for(const t of ['runs','signatures','history','imports']){await assert.rejects(()=>db.exec(`delete from ${t}`),/Append-only/);n++;}
+ await call('add-period','--code=NOV','--name=November','--currency=AUD','--end=2026-11-30','--retain=2027-11-30',by);ok((await call('compliance','--period=NOV')).some(x=>x.rule==='RETENTION'));eq((await call('objects','--period=NOV')).length,0);
+ await fail(['pools',period,'--bogus'],/Unknown option/);await fail(['pools','extra',period],/expects/);await fail(['add-pool',period],/by/);await fail(['nonsense'],/Unknown command/);
+ await db.close();db=null;
+ const launch=(file,args=[])=>spawnSync(process.execPath,[path.join(REPO_ROOT,'scripts',file),...args],{env:process.env,encoding:'utf8'});
+ for(const f of ['docs.mjs','view.mjs']){const res=launch(f);assert.equal(res.status,0,res.stderr);n++;}
+ eq(fs.readdirSync(path.join(dir,'views')).length,3);eq(fs.readdirSync(path.join(dir,'docs-out/customer-cost-statement')).length,4);
+ const cli=launch('costing.mjs',['pools',period,'--json']);eq(cli.status,0);eq(JSON.parse(cli.stdout).length,2);eq(launch('costing.mjs',['set-driver','PICK','Customer','--quantity=1','--evidence=X',by,period]).status,1);
+ process.env.DATABASE_URL='';process.env.DATA_DIR=path.join(dir,'seed');db=await getDb();await migrate(db);await seed(db);await seed(db);eq((await run(db,['objects','--period=DEMO'])).length,3);ok((await run(db,['attention','--period=DEMO'])).length>=3);
+ eq(money('0.01'),1);for(const v of ['-1','NaN','1e3','1.001','1,000']){assert.throws(()=>money(v));n++;}
+ eq(parseCsv('\ufeffa,b\r\n"x\ny","a""b"\r\n'),[{a:'x\ny',b:'a"b'}]);for(const v of ['a,a\n1,2','a,b\n1','a,b\n"x,2']){assert.throws(()=>parseCsv(v));n++;}
+ eq(operations.filter(x=>!seen.has(x)),[]);console.log(`PASS: ${n} assertions; all ${operations.length} CLI operations; atomic import, rounding, stale sign-offs, closed periods, evidence, reports and isolation`);
+}finally{await db?.close();fs.rmSync(dir,{recursive:true,force:true});}

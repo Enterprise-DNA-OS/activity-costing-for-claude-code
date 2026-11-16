@@ -1,11 +1,53 @@
 [
   {
-    "name": "example",
-    "title": "TODO(author): the first document this industry must produce",
-    "for_each": "select gen_random_uuid() as id, 'Example' as name",
-    "file": "name",
+    "name": "allocation-review",
+    "title": "Cost allocation review pack",
+    "for_each": "select id,code from periods order by code",
+    "file": "code",
     "sections": [
-      { "title": "Details", "sql": "select 'replace me' as item, $1::text as record_id" }
+      {
+        "title": "Period and retention policy",
+        "layout": "record",
+        "sql": "select code,name,currency,end_date,retention_until,status,revision from periods where id=$1"
+      },
+      {
+        "title": "Pool basis and evidence",
+        "sql": "select code,name,cost_cents,unit,owner,review_due,evidence,unallocated_cents from v_pool_review where period_id=$1 order by code"
+      },
+      {
+        "title": "Measured activity",
+        "sql": "select pool,object,quantity,allocated_cents from v_allocations where period_id=$1 order by pool,object"
+      },
+      {
+        "title": "Customer contribution",
+        "sql": "select code,name,segment,revenue_cents,direct_cents,overhead_cents,contribution_cents from v_margins where period_id=$1 order by contribution_cents"
+      },
+      {
+        "title": "Calculations and recorded sign-offs",
+        "sql": "select r.id,r.revision,r.operator,r.created_at,s.operator signed_by,s.reason from runs r left join signatures s on s.run_id=r.id where r.period_id=$1 order by r.created_at"
+      }
+    ]
+  },
+  {
+    "name": "customer-cost-statement",
+    "title": "Internal customer cost statement",
+    "for_each": "select id,code from objects order by code",
+    "file": "code",
+    "sections": [
+      {
+        "title": "Customer and period",
+        "layout": "record",
+        "sql": "select o.code,o.name,o.segment,p.code period,p.currency,o.evidence from objects o join periods p on p.id=o.period_id where o.id=$1"
+      },
+      {
+        "title": "Contribution",
+        "layout": "record",
+        "sql": "select revenue_cents,direct_cents,overhead_cents,contribution_cents from v_margins where id=$1"
+      },
+      {
+        "title": "Activity allocation detail",
+        "sql": "select pool,quantity,allocated_cents from v_allocations where object_id=$1 order by pool"
+      }
     ]
   }
 ]

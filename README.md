@@ -1,115 +1,82 @@
-<h1 align="center">Activity Costing for Claude Code</h1>
+# Activity Costing for Claude Code
 
-<p align="center">
-  <strong>The open-source activity costing system that is just a database and Claude Code.</strong>
-</p>
+Own the cost pools, measured activity and customer contribution review. Bring a mapped CostPerform export into a database and ask Claude Code, Codex, OpenCode or Cursor to run the costing desk. MIT licensed.
 
-<p align="center">
-  Created by <a href="https://www.enterprisedna.co"><strong>Enterprise DNA</strong></a>. Free and open source. Works with Claude Code, Codex, OpenCode or Cursor.
-</p>
+## Three ways to use it
 
-<!-- three-doors -->
-<table align="center">
-  <tr>
-    <td align="center"><strong>Do it yourself</strong><br/>Clone it, run it, own it. Free, MIT.<br/><a href="#quick-start">Quick start</a></td>
-    <td align="center"><strong>We customise it</strong><br/>Your fields, your rules, your CostPerform data brought across.<br/><a href="https://enterprisedna.co/omni/book/?utm_source=github&utm_medium=readme&utm_campaign=costperform">Book a call</a></td>
-    <td align="center"><strong>We run it for you</strong><br/>Installed, connected and operated inside Omni. Setup fee, then a retainer.<br/><a href="https://enterprisedna.co/omni/instead-of/costperform?utm_source=github&utm_medium=readme&utm_campaign=costperform">How it works</a></td>
-  </tr>
-</table>
+- **Do it yourself:** install the free version, map your exports and run your own costing review. Hosting and the coding-agent subscription remain your costs.
+- **We customise it:** Enterprise DNA brings your CostPerform data across, maps your cost rules and fields, and builds a web front end or different stack when needed.
+- **We run it for you:** Omni by Enterprise DNA installs, connects and operates your version. One setup fee, then a retainer. [Book a 30-minute call](https://enterprisedna.co/omni/book/?offer=replace-software&utm_campaign=costperform&utm_medium=readme).
 
-<p align="center">
-  <a href="#what-is-this">What is this</a> &bull;
-  <a href="#why-no-front-end">Why no front end</a> &bull;
-  <a href="#quick-start">Quick start</a> &bull;
-  <a href="#the-commands">Commands</a> &bull;
-  <a href="#instead-of-costperform">Instead of CostPerform</a> &bull;
-  <a href="#want-it-installed-and-run-for-you">Installed for you</a> &bull;
-  <a href="#license">License</a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Node-20+-339933?style=flat-square" alt="Node 20+" />
-  <img src="https://img.shields.io/badge/PostgreSQL-any-336791?style=flat-square" alt="PostgreSQL" />
-  <img src="https://img.shields.io/badge/PGlite-embedded-3ecf8e?style=flat-square" alt="PGlite" />
-  <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat-square" alt="MIT License" />
-</p>
-
----
-
-## What is this
-
-Activity Costing for Claude Code does the job you pay CostPerform for, as a Postgres database and a set of agent commands. There is no web front end. You open the folder in [Claude Code](https://claude.com/claude-code) (or Codex, OpenCode, Cursor: see `AGENTS.md`) and ask for what you want in plain language. It runs the right query, and it can answer questions the CostPerform dashboard cannot.
-
-<!-- TODO(author): the annual bill. One sentence: what a 10 to 50 person business typically pays CostPerform per year, all in, with a source. -->
-
-Want the same thing with a web front end, or built on a different stack? That is a customisation, and it is exactly what Enterprise DNA does: [book a call](https://enterprisedna.co/omni/book/?utm_source=github&utm_medium=readme&utm_campaign=costperform).
-
-<!-- TODO(author): two or three sentences on what this specific product covers and who it is for. -->
-
-## Why no front end
-
-- The front end was only ever there because the database was hard to talk to. That is no longer true.
-- Your data sits in plain Postgres tables you own. Any tool can read them. No export, no lock-in.
-- No seats, no tiers, no add-ons. Read [docs/why-no-front-end.md](docs/why-no-front-end.md) for the honest trade-offs too.
-
-## Quick start
-
-Sixty seconds, no database install (an embedded Postgres runs inside Node):
+## Try the fictional distribution business
 
 ```bash
-git clone https://github.com/Enterprise-DNA-OS/activity-costing-for-claude-code.git
-cd activity-costing-for-claude-code
 npm install
+npm test
 npm run demo
 ```
 
-Then open the folder in Claude Code and type a slash command. <!-- TODO(author): name the first command to try. -->
+Node 22 or later. The demo uses a temporary database, prints three real command runs and renders the documents and views. It removes its files afterwards. `npm run demo -- --keep` retains them at the printed temporary path. It never seeds your business database.
 
-### Use it with your own Postgres or Supabase
+## Start your own model
 
-Copy `.env.example` to `.env`, set `DATABASE_URL`, then `npm run migrate`. Same commands, shared data, no per-seat fee.
-
-## The commands
-
-<!-- TODO(author): a table of the slash commands in .claude/commands and what each one does. -->
-
-| Command | What it does |
-|---|---|
-| `/...` | ... |
-
-## Instead of CostPerform
-
-<!-- TODO(author): how to bring data across from CostPerform; link docs/replace-costperform.md -->
-
-## Architecture
-
-```
-activity-costing-for-claude-code/
-  CLAUDE.md                 how the operator wants this run (routing table + house rules)
-  AGENTS.md                 the same, for Codex / OpenCode / Cursor / Gemini CLI
-  .claude/commands/         the slash commands
-  scripts/                  the CLI the commands drive
-  scripts/lib/db.mjs        one adapter: DATABASE_URL (pg) or embedded PGlite
-  supabase/migrations/      plain SQL schema
-  supabase/seed.sql         demo data
-  docs/                     the thesis and the migration guide
+```bash
+npm run migrate
+node scripts/costing.mjs init --name="Your business" --by="Your name"
 ```
 
-## Built for coding agents
+Read [the switching guide](docs/replace-costperform.md), create a period, then test a mapped export with `import costperform` and `--dry-run`. CostPerform exports are configurable. Our examples are fictional mapping fixtures, not native export captures. Map and reconcile a representative period before cutover.
 
-The database, CLI and command recipes work with Claude Code, Codex, OpenCode or Cursor. Ask your coding agent for a new command and have it implement and test the change against the same records.
+DATABASE_URL selects a private Postgres database. Without it, DATA_DIR selects embedded PGlite, defaulting to `.data/db`. OUTPUT_DIR controls generated files. Use one business and one trusted operator per workspace. Operator names are recorded labels, not sign-in permissions. Never expose the owner connection through a browser.
 
-## Contributing
+## The five weekly jobs
 
-Issues and pull requests are welcome. Keep the shape: plain SQL, a small CLI, a slash command per recurring job, no front end.
+1. `/attention`: assign missing source evidence and overdue allocation reviews.
+2. `/drivers`: compare measured consumption with the source export.
+3. `/margins` and `/reconcile`: inspect weak customer contribution and unallocated overhead.
+4. `/scenario`: try a different pool cost without changing the current model.
+5. `/weekly-review`: draft the review, then capture and sign off the agreed calculation.
 
-## Want it installed and run for you?
+There are 28 CLI operations and 32 task commands. [Full syntax](docs/cli.md). Every recurring job has a recipe in `.claude/commands/`. AGENTS.md points other coding agents to the same library.
 
-Enterprise DNA installs Activity Costing for Claude Code for your business, migrates your CostPerform data, connects it to the rest of your tools, and runs it for you as part of **Omni**, our managed Command Center. One setup fee, then a monthly retainer.
+Every positive pool is divided by its measured activity. Largest-remainder rounding preserves whole cents exactly. A pool with no positive consumption stays unallocated, making customer contribution provisional. Input edits advance the model revision; stale calculations cannot be signed or used to close a period. Signed snapshots and their history remain readable after corrections.
 
-- Book a call: [enterprisedna.co/omni/book](https://enterprisedna.co/omni/book/?offer=replace-software&utm_source=github&utm_medium=readme&utm_campaign=costperform)
-- Read more: [enterprisedna.co/omni/instead-of/costperform](https://enterprisedna.co/omni/instead-of/costperform?utm_source=github&utm_medium=readme&utm_campaign=costperform)
+## Documents and views
 
-## License
+Set your business name, logo and colours in brand.json. `npm run docs` renders a period allocation review pack and internal customer cost statements. `npm run view` renders the week, contribution and reconciliation. `/draft-review` produces a private review draft. `/compliance` checks recorded source references, retention settings and model controls with cited rules. [What the checks mean](docs/compliance.md).
 
-MIT. Copyright (c) 2026 Enterprise DNA.
+## Ten questions answered today
+
+`/insights` runs these queries. CostPerform has its own reporting and scenario features; this is a list of included analysis, not a claim that its software cannot answer them.
+
+1. Which customers lose money after their activity share?
+2. Which pools still have cost nobody consumes?
+3. Which allocation bases are overdue for review?
+4. Which cost pools have no accountable owner?
+5. Which customers receive no overhead allocation?
+6. Which customers consume more than half of a cost pool?
+7. Which customer segments carry the weakest contribution?
+8. Which consumption measurements have no supporting evidence?
+9. Which signed calculations have been overtaken by new inputs?
+10. Which owners hold the most unallocated cost?
+
+## Your first hour: ten things to ask for
+
+1. Show the cost pools nobody owns.
+2. Explain the cost of serving our smallest account.
+3. Show which driver measurements are missing.
+4. Find negative contributions after support cost.
+5. Show the difference between input and allocated overhead.
+6. Compare a changed picking cost without saving it.
+7. Draft the finance review in our colours.
+8. Show which sign-offs became stale after a new export.
+9. Add a read-only report by customer segment with `/new-view`.
+10. Add our region field to the model and import with `/customise`.
+
+## Scope and operating limits
+
+This base implements one-stage proportional allocation of nonnegative overhead pools to customers or services. It does not import proprietary CostPerform whole-model files, reproduce reciprocal or multi-stage allocations, execute custom formulas, convert currencies, calculate tax or prepare regulatory returns. Credits require a model extension. Connections, collaborative data-entry portals and authenticated approvals need development for your version.
+
+Source references are text pointers, not copies of evidence. JSON export is a readable archive, not a backup restore tool. Keep original source files and tested backups. Only recorded controls are checked; the owner remains responsible for accounting policy, retention, storage and evidence quality. Database owners can bypass application controls. No live customer or vendor system is changed.
+
+[Research](docs/research.md) · [Verification](docs/verification.md) · [Why no front end](docs/why-no-front-end.md)
