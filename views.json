@@ -15,7 +15,8 @@
     "sections": [
       {
         "title": "Contribution by period and customer",
-        "sql": "select pe.code period,pe.currency,m.code,m.name,m.revenue_cents,m.direct_cents,m.overhead_cents,m.contribution_cents from v_margins m join periods pe on pe.id=m.period_id order by pe.code,m.contribution_cents"
+        "sql": "select pe.code period,pe.currency,m.code,m.name,m.revenue_cents,m.direct_cents,m.overhead_cents,m.contribution_cents from v_margins m join periods pe on pe.id=m.period_id order by pe.code,m.contribution_cents",
+        "note": "Contribution excludes overhead that has no measured activity. Read reconciliation and resolve unallocated cost before sign-off."
       }
     ]
   },

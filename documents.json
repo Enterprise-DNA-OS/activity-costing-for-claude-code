@@ -20,7 +20,8 @@
       },
       {
         "title": "Customer contribution",
-        "sql": "select code,name,segment,revenue_cents,direct_cents,overhead_cents,contribution_cents from v_margins where period_id=$1 order by contribution_cents"
+        "sql": "select code,name,segment,revenue_cents,direct_cents,overhead_cents,contribution_cents from v_margins where period_id=$1 order by contribution_cents",
+        "note": "Contribution excludes overhead that has no measured activity. Read reconciliation and resolve unallocated cost before sign-off."
       },
       {
         "title": "Calculations and recorded sign-offs",
@@ -42,7 +43,8 @@
       {
         "title": "Contribution",
         "layout": "record",
-        "sql": "select revenue_cents,direct_cents,overhead_cents,contribution_cents from v_margins where id=$1"
+        "sql": "select revenue_cents,direct_cents,overhead_cents,contribution_cents from v_margins where id=$1",
+        "note": "Contribution excludes overhead that has no measured activity. Read reconciliation and resolve unallocated cost before sign-off."
       },
       {
         "title": "Activity allocation detail",
